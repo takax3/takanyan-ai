@@ -24,6 +24,8 @@ object Main {
 	private var twitter: Twitter? = null
 	private var accessToken: AccessToken? = null
 	
+	private const val WAIT_MINUTE = 15
+	
 	
 	@JvmStatic
 	fun main(args: Array<String>) {
@@ -83,6 +85,23 @@ object Main {
 		twitter!!.oAuthAccessToken = accessToken
 		
 		
+		while (true) {
+			
+			val output = analyze()
+			
+			// 出力
+			println(output)
+			twitter!!.updateStatus(output)
+			
+			Thread.sleep((WAIT_MINUTE * 60 * 1000).toLong())
+			
+		}
+		
+	}
+	
+	
+	private fun analyze() : String{
+		
 		// 解析元データ取得
 		val paging = Paging()
 		paging.count = 200
@@ -98,7 +117,7 @@ object Main {
 		for (status in timeline) {
 			val text = status.text
 			// リプライ、URL付、タグツイを除外
-			if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1) {
+			if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1 && status.user.id != twitter!!.id) {
 				
 				println("------------------------")
 				println(status.text)
@@ -139,15 +158,12 @@ object Main {
 		var output = beforeWord
 		
 		for (i in 1..length.get(Random().nextInt(length.size())).asInt) {
-			var wordConnection = array.getAsJsonArray(beforeWord)
-			if (wordConnection == null) break
+			val wordConnection = array.getAsJsonArray(beforeWord) ?: break
 			beforeWord = wordConnection.get(Random().nextInt(wordConnection.size())).toString().replace("\"", "")
 			output += beforeWord
 		}
 		
-		// 出力
-		println(output)
-		twitter!!.updateStatus(output)
+		return output
 		
 	}
 	
