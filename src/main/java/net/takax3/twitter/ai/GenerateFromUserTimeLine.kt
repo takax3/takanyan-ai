@@ -107,9 +107,11 @@ object GenerateFromUserTimeLine {
 			val paging = Paging()
 			paging.count = 200
 			
-			for (i in 0 .. config!!.collectTweetNum!! / 200) {
-				if (i == config!!.collectTweetNum!! / 200) {
-					if (config!!.collectTweetNum!! % 200 == 0) break else paging.count = config!!.collectTweetNum!! % 200
+			val maxTweets = if (config!!.collectTweetNum!! < twitter!!.showUser(config!!.ownerUserID!!).statusesCount) config!!.collectTweetNum!! else twitter!!.showUser(config!!.ownerUserID!!).statusesCount
+			
+			for (i in 0 .. maxTweets / 200) {
+				if (i == maxTweets / 200) {
+					if (maxTweets % 200 == 0) break else paging.count = maxTweets % 200
 				}
 				val timeline = twitter!!.getUserTimeline(config!!.ownerUserID!!, paging)
 				
