@@ -28,8 +28,8 @@ class Analyzer {
 		while (true) {
 			val wordConnection = array.getAsJsonArray(beforeWord) ?: break
 			val word = wordConnection.get(Random().nextInt(wordConnection.size())) ?: break
-			if (word.toString() == "\"\"") break
-			beforeWord = word.toString().replace("\"", "")
+			if (word.asString == "") break
+			beforeWord = word.asString
 			outputText += beforeWord
 		}
 		
