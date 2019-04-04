@@ -108,10 +108,9 @@ object Main {
 		val timeline = twitter!!.getHomeTimeline(paging)
 		
 		// 解析データ初期化
-		val word = JsonObject()
-		word.add("firstWord", JsonArray())
-		word.add("length", JsonArray())
-		word.add("array", JsonObject())
+		val analyzedObject = JsonObject()
+		analyzedObject.add("firstWord", JsonArray())
+		analyzedObject.add("array", JsonObject())
 		
 		// 一件一件の解析
 		for (status in timeline) {
@@ -124,12 +123,10 @@ object Main {
 				val list: List<String> = split(text)
 				println(list)
 				
-				val firstWord = word.getAsJsonArray("firstWord")
-				val length = word.getAsJsonArray("length")
-				val array = word.getAsJsonObject("array")
+				val firstWord = analyzedObject.getAsJsonArray("firstWord")
+				val array = analyzedObject.getAsJsonObject("array")
 				firstWord.add(list[0])
-				length.add(list.size)
-				word.add("firstWord", firstWord)
+				analyzedObject.add("firstWord", firstWord)
 				
 				for (i in 0 .. list.size-2) {
 					var wordConnection = array.getAsJsonArray(list[i])
@@ -137,29 +134,34 @@ object Main {
 					wordConnection.add(list[i + 1])
 					array.add(list[i], wordConnection)
 				}
-				word.add("array", array)
+				var wordConnection = array.getAsJsonArray(list[list.size-1])
+				if (wordConnection == null) wordConnection = JsonArray()
+				wordConnection.add("")
+				array.add(list[list.size-1], wordConnection)
+				analyzedObject.add("array", array)
 				
 			}
 		}
 		
 		// デバッグ用の解析データ出力
-		println(gson.toJson(word))
+		println(gson.toJson(analyzedObject))
 //		val fileWriter = FileWriter(File("word.json"))
 //		fileWriter.write(gson.toJson(word))
 //		fileWriter.close()
 		
 		
 		// 解析したデータから文章を生成
-		val firstWord = word.getAsJsonArray("firstWord")
-		val length = word.getAsJsonArray("length")
-		val array = word.getAsJsonObject("array")
+		val firstWord = analyzedObject.getAsJsonArray("firstWord")
+		val array = analyzedObject.getAsJsonObject("array")
 		
 		var beforeWord = firstWord.get(Random().nextInt(firstWord.size())).toString().replace("\"", "")
 		var output = beforeWord
 		
-		for (i in 1..length.get(Random().nextInt(length.size())).asInt) {
+		while (true) {
 			val wordConnection = array.getAsJsonArray(beforeWord) ?: break
-			beforeWord = wordConnection.get(Random().nextInt(wordConnection.size())).toString().replace("\"", "")
+			val word = wordConnection.get(Random().nextInt(wordConnection.size())) ?: break
+			if (word.toString().replace("\"", "") == "") break
+			beforeWord = word.toString().replace("\"", "")
 			output += beforeWord
 		}
 		
