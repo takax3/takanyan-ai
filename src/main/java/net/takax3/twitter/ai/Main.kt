@@ -24,8 +24,7 @@ object Main {
 	private var twitter: Twitter? = null
 	private var accessToken: AccessToken? = null
 	
-	private const val WAIT_MINUTE = 15
-	
+	private var config: Config? = null
 	
 	@JvmStatic
 	fun main(args: Array<String>) {
@@ -39,8 +38,8 @@ object Main {
 		consumerKey = readConsumerKeys.consumerKey!!
 		consumerSecret = readConsumerKeys.consumerSecret!!
 		
-		val file = File("AccessToken.json")
-		if (!file.exists()) {
+		val accessTokenFile = File("AccessToken.json")
+		if (!accessTokenFile.exists()) {
 			
 			accessToken = OAuth().getAccessToken(consumerKey, consumerSecret)
 			
@@ -49,17 +48,17 @@ object Main {
 			}
 			
 			try {
-				val config = ConfigAccessToken()
-				config.accessToken = accessToken!!.token
-				config.accessSecret = accessToken!!.tokenSecret
+				val configAccessToken = ConfigAccessToken()
+				configAccessToken.accessToken = accessToken!!.token
+				configAccessToken.accessSecret = accessToken!!.tokenSecret
 				
-				val fileWriter = FileWriter(file)
+				val fileWriter = FileWriter(accessTokenFile)
 				
-				fileWriter.write(gson.toJson(config))
+				fileWriter.write(gson.toJson(configAccessToken))
 				
 				fileWriter.close()
 				
-				accessToken = AccessToken(config.accessToken, config.accessSecret)
+				accessToken = AccessToken(configAccessToken.accessToken, configAccessToken.accessSecret)
 			} catch (e: Exception) {
 				e.printStackTrace()
 				return
@@ -67,12 +66,12 @@ object Main {
 			
 		} else {
 			try {
-				val fileReader = FileReader(file)
+				val fileReader = FileReader(accessTokenFile)
 				
-				val config = gson.fromJson(fileReader, ConfigAccessToken::class.java)
+				val configAccessToken = gson.fromJson(fileReader, ConfigAccessToken::class.java)
 				fileReader.close()
 				
-				accessToken = AccessToken(config.accessToken, config.accessSecret)
+				accessToken = AccessToken(configAccessToken.accessToken, configAccessToken.accessSecret)
 			} catch (e: Exception) {
 				e.printStackTrace()
 				return
@@ -84,6 +83,27 @@ object Main {
 		twitter!!.setOAuthConsumer(consumerKey, consumerSecret)
 		twitter!!.oAuthAccessToken = accessToken
 		
+		val configFile = File("Config.json")
+		if(!configFile.exists()) {
+			try {
+				config = Config()
+				val fileWriter = FileWriter(configFile)
+				fileWriter.write(gson.toJson(config))
+				fileWriter.close()
+			} catch (e: Exception) {
+				e.printStackTrace()
+				return
+			}
+		} else {
+			try {
+				val fileReader = FileReader(configFile)
+				config = gson.fromJson(fileReader, Config::class.java)
+				fileReader.close()
+			} catch (e: Exception) {
+				e.printStackTrace()
+				return
+			}
+		}
 		
 		while (true) {
 			
@@ -93,7 +113,7 @@ object Main {
 			println(output)
 			twitter!!.updateStatus(output)
 			
-			Thread.sleep((WAIT_MINUTE * 60 * 1000).toLong())
+			Thread.sleep((config!!.intervalMinute!! * 60 * 1000).toLong())
 			
 		}
 		
@@ -102,51 +122,61 @@ object Main {
 	
 	private fun analyze() : String{
 		
-		// 解析元データ取得
-		val paging = Paging()
-		paging.count = 200
-		val timeline = twitter!!.getHomeTimeline(paging)
-		
 		// 解析データ初期化
 		val analyzedObject = JsonObject()
 		analyzedObject.add("firstWord", JsonArray())
 		analyzedObject.add("array", JsonObject())
 		
-		// 一件一件の解析
-		for (status in timeline) {
-			val text = status.text
-			// リプライ、URL付、タグツイを除外
-			if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1 && status.user.id != twitter!!.id) {
-				
-				println("------------------------")
-				println(status.text)
-				val list: List<String> = split(text)
-				println(list)
-				
-				val firstWord = analyzedObject.getAsJsonArray("firstWord")
-				val array = analyzedObject.getAsJsonObject("array")
-				firstWord.add(list[0])
-				analyzedObject.add("firstWord", firstWord)
-				
-				for (i in 0 .. list.size-2) {
-					var wordConnection = array.getAsJsonArray(list[i])
-					if (wordConnection == null) wordConnection = JsonArray()
-					wordConnection.add(list[i + 1])
-					array.add(list[i], wordConnection)
-				}
-				var wordConnection = array.getAsJsonArray(list[list.size-1])
-				if (wordConnection == null) wordConnection = JsonArray()
-				wordConnection.add("")
-				array.add(list[list.size-1], wordConnection)
-				analyzedObject.add("array", array)
-				
+		// 解析元データ取得
+		val paging = Paging()
+		paging.count = 200
+		
+		for (i in 0 .. config!!.collectTweetNum!! / 200) {
+			if (i == config!!.collectTweetNum!! / 200) {
+				if (config!!.collectTweetNum!! % 200 == 0) break else paging.count = config!!.collectTweetNum!! % 200
 			}
+			val timeline = twitter!!.getUserTimeline(config!!.ownerUserID!!, paging)
+			
+			// 一件一件の解析
+			for (status in timeline) {
+				val text = status.text
+				// リプライ、URL付、タグツイを除外
+				if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1 && status.user.id != twitter!!.id) {
+					
+					println("------------------------")
+					println(status.text)
+					val list: List<String> = split(text)
+					println(list)
+					
+					if (list.isNotEmpty()) {
+						val firstWord = analyzedObject.getAsJsonArray("firstWord")
+						val array = analyzedObject.getAsJsonObject("array")
+						firstWord.add(list[0])
+						analyzedObject.add("firstWord", firstWord)
+						
+						for (j in 0 .. list.size-2) {
+							var wordConnection = array.getAsJsonArray(list[j])
+							if (wordConnection == null) wordConnection = JsonArray()
+							wordConnection.add(list[j + 1])
+							array.add(list[j], wordConnection)
+						}
+						var wordConnection = array.getAsJsonArray(list[list.size-1])
+						if (wordConnection == null) wordConnection = JsonArray()
+						wordConnection.add("")
+						array.add(list[list.size-1], wordConnection)
+						analyzedObject.add("array", array)
+					}
+					
+				}
+				paging.maxId = status.id
+			}
+			
 		}
 		
 		// デバッグ用の解析データ出力
 		println(gson.toJson(analyzedObject))
 //		val fileWriter = FileWriter(File("word.json"))
-//		fileWriter.write(gson.toJson(word))
+//		fileWriter.write(gson.toJson(analyzedObject))
 //		fileWriter.close()
 		
 		
@@ -193,6 +223,14 @@ object Main {
 		
 		var accessToken: String? = null
 		var accessSecret: String? = null
+		
+	}
+	
+	class Config {
+		
+		var ownerUserID: String? = "takax3_M"
+		var intervalMinute: Int? = 15
+		var collectTweetNum: Int? = 1000
 		
 	}
 	
