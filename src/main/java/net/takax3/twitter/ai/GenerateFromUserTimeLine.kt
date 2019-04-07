@@ -133,7 +133,8 @@ object GenerateFromUserTimeLine {
 			
 			val analyzedJsonObject = Analyzer().analyze(sourceList)
 			println(gson.toJson(analyzedJsonObject))
-			val outputText = Analyzer().generate(analyzedJsonObject)
+			var outputText: String
+			do outputText = Analyzer().generate(analyzedJsonObject) while (outputText.length > 140)
 			
 			// 出力
 			println(outputText)
