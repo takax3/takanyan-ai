@@ -85,28 +85,19 @@ object GenerateFromCSV {
 			return
 		}
 		
-		if (!tweetsJSONFile.exists()) {
+		val requiredAnalyze: Boolean
+		requiredAnalyze = if (!tweetsJSONFile.exists()) {
 			println("解析済みファイルが存在しません。")
-			println("解析を開始します。")
-			val tweets: List<Tweet> = CsvToBeanBuilder<Tweet>(FileReader(tweetsCSVFile)).withType(Tweet::class.java).build().parse()
-			val source = ArrayList<String>()
-			for (tweet in tweets) {
-				val text = tweet.text!!
-				if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1) {
-					println("------------------------")
-					println(text)
-					source.add(text)
-				}
-			}
-			println("計 ${source.size} 件のツイートを処理します。")
-			
-			analyzedWords = Analyzer().analyze(source)
-			
-			val fileWriter = FileWriter(tweetsJSONFile)
-			fileWriter.write(gson.toJson(analyzedWords))
-			fileWriter.close()
+			true
 		} else if (tweetsJSONFile.lastModified() < tweetsCSVFile.lastModified()) {
 			println("解析済みファイルが元ファイルより古いです。")
+			true
+		} else {
+			println("解析済みファイルから処理します。")
+			false
+		}
+		
+		if (requiredAnalyze) {
 			println("解析を開始します。")
 			val tweets: List<Tweet> = CsvToBeanBuilder<Tweet>(FileReader(tweetsCSVFile)).withType(Tweet::class.java).build().parse()
 			val source = ArrayList<String>()
@@ -124,7 +115,6 @@ object GenerateFromCSV {
 			
 			FileWriter(tweetsJSONFile).write(gson.toJson(analyzedWords))
 		} else {
-			println("解析済みファイルから処理します。")
 			try {
 				analyzedWords = gson.fromJson(FileReader(tweetsJSONFile), JsonObject::class.java)
 			} catch (e: Exception) {
