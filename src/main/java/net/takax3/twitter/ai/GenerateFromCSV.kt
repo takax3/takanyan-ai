@@ -31,46 +31,8 @@ object GenerateFromCSV {
 		consumerKey = readConsumerKeys.consumerKey!!
 		consumerSecret = readConsumerKeys.consumerSecret!!
 		
-		val accessTokenFile = File("AccessToken.json")
-		if (!accessTokenFile.exists()) {
-			
-			accessToken = OAuth().getAccessToken(consumerKey, consumerSecret)
-			
-			if (accessToken !is AccessToken) {
-				return
-			}
-			
-			try {
-				val configAccessToken = ConfigAccessToken()
-				configAccessToken.accessToken = accessToken!!.token
-				configAccessToken.accessSecret = accessToken!!.tokenSecret
-				
-				val fileWriter = FileWriter(accessTokenFile)
-				
-				fileWriter.write(gson.toJson(configAccessToken))
-				
-				fileWriter.close()
-				
-				accessToken = AccessToken(configAccessToken.accessToken, configAccessToken.accessSecret)
-			} catch (e: Exception) {
-				e.printStackTrace()
-				return
-			}
-			
-		} else {
-			try {
-				val fileReader = FileReader(accessTokenFile)
-				
-				val configAccessToken = gson.fromJson(fileReader, ConfigAccessToken::class.java)
-				fileReader.close()
-				
-				accessToken = AccessToken(configAccessToken.accessToken, configAccessToken.accessSecret)
-			} catch (e: Exception) {
-				e.printStackTrace()
-				return
-			}
-			
-		}
+		accessToken = ReadAccessTokens.read(consumerKey, consumerSecret)
+		if (accessToken !is AccessToken) return
 		
 		twitter = TwitterFactory().instance
 		twitter!!.setOAuthConsumer(consumerKey, consumerSecret)
@@ -133,13 +95,6 @@ object GenerateFromCSV {
 		
 	}
 	
-	
-	class ConfigAccessToken {
-		
-		var accessToken: String? = null
-		var accessSecret: String? = null
-		
-	}
 	
 	class Tweet {
 		
