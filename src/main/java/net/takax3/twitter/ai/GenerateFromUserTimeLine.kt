@@ -1,12 +1,11 @@
 package net.takax3.twitter.ai
 
 import com.google.gson.GsonBuilder
-import twitter4j.Paging
 import twitter4j.Twitter
 import twitter4j.TwitterFactory
 import twitter4j.auth.AccessToken
 import java.io.*
-import kotlin.collections.ArrayList
+import kotlin.concurrent.thread
 
 
 object GenerateFromUserTimeLine {
@@ -25,9 +24,7 @@ object GenerateFromUserTimeLine {
 		
 		val readConsumerKeys = ReadConsumerKeys()
 		
-		if (!readConsumerKeys.read("ConsumerKey.json")) {
-			return
-		}
+		if (!readConsumerKeys.read("ConsumerKey.json")) return
 		
 		consumerKey = readConsumerKeys.consumerKey!!
 		consumerSecret = readConsumerKeys.consumerSecret!!
@@ -35,72 +32,78 @@ object GenerateFromUserTimeLine {
 		accessToken = ReadAccessTokens.read(consumerKey, consumerSecret)
 		if (accessToken !is AccessToken) return
 		
-		twitter = TwitterFactory().instance
-		twitter!!.setOAuthConsumer(consumerKey, consumerSecret)
-		twitter!!.oAuthAccessToken = accessToken
+		twitter = TwitterFactory().instance.apply {
+			setOAuthConsumer(consumerKey, consumerSecret)
+			oAuthAccessToken = accessToken
+		}
 		
-		val configFile = File("Config_UTL.json")
-		if(!configFile.exists()) {
-			try {
-				config = Config()
-				val fileWriter = FileWriter(configFile)
-				fileWriter.write(gson.toJson(config))
-				fileWriter.close()
-			} catch (e: Exception) {
-				e.printStackTrace()
-				return
-			}
-		} else {
-			try {
-				val fileReader = FileReader(configFile)
-				config = gson.fromJson(fileReader, Config::class.java)
-				fileReader.close()
-			} catch (e: Exception) {
-				e.printStackTrace()
-				return
+		File("Config_UTL.json").run {
+			if (!exists()) {
+				try {
+					config = Config()
+					FileWriter(this).run {
+						write(gson.toJson(config))
+						close()
+					}
+				} catch (e: Exception) {
+					e.printStackTrace()
+					return
+				}
+			} else {
+				try {
+					FileReader(this).run {
+						config = gson.fromJson(this, Config::class.java)
+						close()
+					}
+				} catch (e: Exception) {
+					e.printStackTrace()
+					return
+				}
 			}
 		}
 		
 		while (true) {
 			
-			val sourceList = ArrayList<String>()
-			
-			// 解析元データ取得
-			val paging = Paging()
-			paging.count = 200
-			
-			val maxTweets = if (config!!.collectTweetNum!! < twitter!!.showUser(config!!.ownerUserID!!).statusesCount) config!!.collectTweetNum!! else twitter!!.showUser(config!!.ownerUserID!!).statusesCount
-			
-			for (i in 0 .. maxTweets / 200) {
-				if (i == maxTweets / 200) {
-					if (maxTweets % 200 == 0) break else paging.count = maxTweets % 200
-				}
-				val timeline = twitter!!.getUserTimeline(config!!.ownerUserID!!, paging)
+			thread {
+				val sourceList = ArrayList<String>()
 				
-				// 一件一件の解析
-				for (status in timeline) {
-					val text = status.text
-					// リプライ、URL付、タグツイを除外
-					if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1 && status.user.id != twitter!!.id) {
-						
-						println("------------------------")
-						println(status.text)
-						sourceList.add(status.text)
-						
+				// 解析元データ取得
+				val paging = twitter4j.Paging()
+				paging.count = 200
+				
+				val maxTweets = if (config!!.collectTweetNum!! < twitter!!.showUser(config!!.ownerUserID!!).statusesCount) config!!.collectTweetNum!! else twitter!!.showUser(config!!.ownerUserID!!).statusesCount
+				
+				for (i in 0..maxTweets / 200) {
+					if (i == maxTweets / 200) {
+						if (maxTweets % 200 == 0) break else paging.count = maxTweets % 200
 					}
-					paging.maxId = status.id
+					twitter!!.getUserTimeline(config!!.ownerUserID!!, paging).run {
+						for (status in this) {
+							// 一件一件の解析
+							status.text.run {
+								// リプライ、URL付、タグツイを除外
+								if (contains("@") && contains("://") && contains("#") && status.user.id != twitter!!.id) {
+									println("------------------------")
+									println(this)
+									sourceList.add(this)
+								}
+							}
+							paging.maxId = status.id
+						}
+					}
+					
 				}
 				
+				val analyzedJsonObject = Analyzer().analyze(sourceList)
+				
+				println(gson.toJson(analyzedJsonObject))
+				var outputText: String
+				do outputText = Analyzer().generate(analyzedJsonObject) while (outputText.length > 140)
+				
+				// 出力
+				println(outputText)
+				twitter!!.updateStatus(outputText)
 			}
-			
-			val analyzedJsonObject = Analyzer().analyze(sourceList)
-			println(gson.toJson(analyzedJsonObject))
-			var outputText: String
-			do outputText = Analyzer().generate(analyzedJsonObject) while (outputText.length > 140)
-			
-			// 出力
-			println(outputText)
-			twitter!!.updateStatus(outputText)
 			
 			Thread.sleep((config!!.intervalMinute!! * 60 * 1000).toLong())
 			

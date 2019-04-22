@@ -7,22 +7,23 @@ import org.codelibs.neologd.ipadic.lucene.analysis.ja.JapaneseTokenizer
 import java.io.IOException
 import java.io.StringReader
 import java.util.*
+import kotlin.run
 
 class Analyzer {
 	
-	fun generate(list: List<String>) : String {
+	fun generate(list: List<String>): String {
 		
 		return generate(analyze(list))
 		
 	}
 	
 	
-	fun generate(jsonObject: JsonObject) : String {
+	fun generate(jsonObject: JsonObject): String {
 		
 		val firstWord = jsonObject.getAsJsonArray("firstWord")
 		val array = jsonObject.getAsJsonObject("array")
 		
-		var beforeWord = firstWord.get(Random().nextInt(firstWord.size())).toString().replace("\"", "")
+		var beforeWord = firstWord.get(Random().nextInt(firstWord.size())).asString
 		var outputText = beforeWord
 		
 		while (true) {
@@ -38,33 +39,40 @@ class Analyzer {
 	}
 	
 	
-	fun analyze(list: List<String>) : JsonObject {
+	fun analyze(list: List<String>, analyzedObject: JsonObject = JsonObject(), depth: Int = 1): JsonObject {
 		
 		// 解析データ初期化
-		val analyzedObject = JsonObject()
-		analyzedObject.add("firstWord", JsonArray())
-		analyzedObject.add("array", JsonObject())
+		analyzedObject.run {
+			if (!has("depth")) {
+				addProperty("depth", depth)
+			} else if (get("depth").asInt != depth) {
+				remove("depth")
+				remove("firstWord")
+				remove("array")
+				addProperty("depth", depth)
+				add("firstWord", JsonArray())
+				add("array", JsonObject())
+			}
+			if (!has("firstWord")) add("firstWord", JsonArray())
+			if (!has("array")) add("array", JsonObject())
+		}
 		
 		for (string in list) {
 			val splitText: List<String> = split(string)
 			
 			if (splitText.isNotEmpty()) {
-				val firstWord = analyzedObject.getAsJsonArray("firstWord")
-				val array = analyzedObject.getAsJsonObject("array")
-				firstWord.add(splitText[0])
-				analyzedObject.add("firstWord", firstWord)
 				
-				for (j in 0 .. splitText.size-2) {
-					var wordConnection = array.getAsJsonArray(splitText[j])
-					if (wordConnection == null) wordConnection = JsonArray()
-					wordConnection.add(splitText[j + 1])
-					array.add(splitText[j], wordConnection)
-				}
-				var wordConnection = array.getAsJsonArray(splitText[splitText.size-1])
-				if (wordConnection == null) wordConnection = JsonArray()
-				wordConnection.add("")
-				array.add(splitText[splitText.size-1], wordConnection)
-				analyzedObject.add("array", array)
+				analyzedObject.add("firstWord", analyzedObject.getAsJsonArray("firstWord").apply {
+					add(splitText[0])
+				})
+				
+				analyzedObject.add("array", analyzedObject.getAsJsonObject("array").apply {
+					repeat(splitText.size - 1) {
+						add(splitText[it], (getAsJsonArray(splitText[it]) ?: JsonArray()).apply { add(splitText[it + 1]) })
+					}
+					add(splitText[splitText.size - 1], (getAsJsonArray(splitText[splitText.size - 1]) ?: JsonArray()).apply { add("") })
+				})
+				
 			}
 			
 		}
@@ -73,15 +81,17 @@ class Analyzer {
 		
 	}
 	
-	fun split(string: String) : List<String> {
+	fun split(string: String): List<String> {
 		val list = ArrayList<String>()
 		try {
 			JapaneseTokenizer(null, false, JapaneseTokenizer.Mode.NORMAL).use { japaneseTokenizer ->
-				val charTermAttribute = japaneseTokenizer.addAttribute(CharTermAttribute::class.java)
-				japaneseTokenizer.setReader(StringReader(string))
-				japaneseTokenizer.reset()
-				while (japaneseTokenizer.incrementToken()) {
-					list.add(charTermAttribute.toString())
+				japaneseTokenizer.run {
+					val charTermAttribute = addAttribute(CharTermAttribute::class.java)
+					setReader(StringReader(string))
+					reset()
+					while (incrementToken()) {
+						list.add(charTermAttribute.toString())
+					}
 				}
 			}
 		} catch (e: IOException) {

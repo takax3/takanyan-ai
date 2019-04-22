@@ -3,6 +3,7 @@ package net.takax3.twitter.ai
 import twitter4j.TwitterException
 import twitter4j.TwitterFactory
 import twitter4j.auth.AccessToken
+import java.awt.Desktop
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.URI
@@ -20,7 +21,7 @@ class OAuth {
 				val twitter = TwitterFactory().instance
 				twitter.setOAuthConsumer(consumerKey, consumerSecret)
 				val requestToken = twitter.oAuthRequestToken
-				java.awt.Desktop.getDesktop().browse(URI(requestToken.authenticationURL))
+				Desktop.getDesktop().browse(URI(requestToken.authenticationURL))
 				print("認証後に表示されるPINコードを入力してください... : ")
 				val pin = br.readLine()
 				accessToken = try {

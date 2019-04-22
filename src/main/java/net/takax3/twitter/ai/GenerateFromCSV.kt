@@ -9,6 +9,7 @@ import twitter4j.auth.AccessToken
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
+import kotlin.concurrent.thread
 
 object GenerateFromCSV {
 	
@@ -24,19 +25,17 @@ object GenerateFromCSV {
 		
 		val readConsumerKeys = ReadConsumerKeys()
 		
-		if (!readConsumerKeys.read("ConsumerKey.json")) {
-			return
-		}
+		if (!readConsumerKeys.read("ConsumerKey.json")) return
 		
 		consumerKey = readConsumerKeys.consumerKey!!
 		consumerSecret = readConsumerKeys.consumerSecret!!
 		
-		accessToken = ReadAccessTokens.read(consumerKey, consumerSecret)
-		if (accessToken !is AccessToken) return
+		accessToken = ReadAccessTokens.read(consumerKey, consumerSecret) ?: return
 		
-		twitter = TwitterFactory().instance
-		twitter!!.setOAuthConsumer(consumerKey, consumerSecret)
-		twitter!!.oAuthAccessToken = accessToken
+		twitter = TwitterFactory().instance.apply {
+			setOAuthConsumer(consumerKey, consumerSecret)
+			oAuthAccessToken = accessToken
+		}
 		
 		val tweetsCSVFile = File("tweets.csv")
 		val tweetsJSONFile = File("tweets.json")
@@ -64,11 +63,12 @@ object GenerateFromCSV {
 			val tweets: List<Tweet> = CsvToBeanBuilder<Tweet>(FileReader(tweetsCSVFile)).withType(Tweet::class.java).build().parse()
 			val source = ArrayList<String>()
 			for (tweet in tweets) {
-				val text = tweet.text!!
-				if (text.indexOf("@") == -1 && text.indexOf("://") == -1 && text.indexOf("#") == -1 && tweet.source!!.indexOf("UserReport") == -1) {
-					println("------------------------")
-					println(text)
-					source.add(text)
+				tweet.text!!.run {
+					if (contains("@") && contains("://") && contains("#") && tweet.source!!.contains("UserReport")) {
+						println("------------------------")
+						println(this)
+						source.add(this)
+					}
 				}
 			}
 			println("計 ${source.size} 件のツイートを処理します。")
@@ -87,9 +87,13 @@ object GenerateFromCSV {
 		
 		
 		while (true) {
-			val word = Analyzer().generate(analyzedWords)
-			twitter!!.updateStatus("$word\r\n(Source Full Ver)")
-			println("$word\r\n(Source Full Ver)")
+			thread {
+				var outputText: String
+				do outputText = Analyzer().generate(analyzedWords) while (outputText.length > 140)
+				
+				twitter!!.updateStatus("$outputText\r\n(Source Full Ver)")
+				println("$outputText\r\n(Source Full Ver)")
+			}
 			Thread.sleep(15 * 60 * 1000)
 		}
 		

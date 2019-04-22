@@ -1,6 +1,7 @@
 package net.takax3.twitter.ai
 
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonObject
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -13,40 +14,47 @@ class ReadConsumerKeys {
 	fun read(filename: String = "ConsumerKey.json") : Boolean {
 		
 		val gson = GsonBuilder().setPrettyPrinting().serializeNulls().create()
-		val file = File(filename)
 		
-		return if (!file.exists()) {
-			try {
+		File(filename).run {
+			return if (!exists()) {
+				try {
+					
+					FileWriter(this).run {
+						write(gson.toJson(JsonObject().apply {
+							addProperty("ConsumerKey", "")
+							addProperty("ConsumerSecret", "")
+						}))
+						close()
+					}
+					println("生成された $filename にCS/CKを書き込んでください")
+					false
+					
+				} catch (e: Exception) {
+					e.printStackTrace()
+					false
+				}
 				
-				val temp = ReadConsumerKeys()
-				val fileWriter = FileWriter(file)
-				fileWriter.write(gson.toJson(temp))
-				fileWriter.close()
-				println("生成された $filename にCS/CKを書き込んでください")
-				false
-				
-			} catch (e: Exception) {
-				e.printStackTrace()
-				false
-			}
-			
-		} else {
-			try {
-				
-				println("$filename からCS/CKを読み込みます……")
-				val fileReader = FileReader(file)
-				val temp = gson.fromJson(fileReader, ReadConsumerKeys::class.java)
-				fileReader.close()
-				consumerKey = temp.consumerKey
-				consumerSecret = temp.consumerSecret
-				println("$filename からCS/CKを読み込みました。")
-				true
-				
-			} catch (e: Exception) {
-				e.printStackTrace()
-				false
+			} else {
+				try {
+					
+					println("$filename からCS/CKを読み込みます……")
+					FileReader(this).run {
+						gson.fromJson(this, JsonObject::class.java).run {
+							consumerKey = get("ConsumerKey").asString
+							consumerSecret = get("ConsumerSecret").asString
+						}
+						close()
+					}
+					println("$filename からCS/CKを読み込みました。")
+					true
+					
+				} catch (e: Exception) {
+					e.printStackTrace()
+					false
+				}
 			}
 		}
+		
 	}
 	
 }
