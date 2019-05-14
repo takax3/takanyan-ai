@@ -4,8 +4,6 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.opencsv.bean.CsvToBeanBuilder
 import twitter4j.Twitter
-import twitter4j.TwitterFactory
-import twitter4j.auth.AccessToken
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -13,29 +11,13 @@ import kotlin.concurrent.thread
 
 object GenerateFromCSV {
 	
-	private var consumerKey = ""
-	private var consumerSecret = ""
-	
 	private val gson = GsonBuilder().setPrettyPrinting().serializeNulls().create()
 	private var twitter: Twitter? = null
-	private var accessToken: AccessToken? = null
 	
 	@JvmStatic
 	fun main(args: Array<String>) {
 		
-		val readConsumerKeys = ReadConsumerKeys()
-		
-		if (!readConsumerKeys.read("ConsumerKey.json")) return
-		
-		consumerKey = readConsumerKeys.consumerKey!!
-		consumerSecret = readConsumerKeys.consumerSecret!!
-		
-		accessToken = ReadAccessTokens.read(consumerKey, consumerSecret) ?: return
-		
-		twitter = TwitterFactory().instance.apply {
-			setOAuthConsumer(consumerKey, consumerSecret)
-			oAuthAccessToken = accessToken
-		}
+		twitter = TwitterConnector.connect()
 		
 		val tweetsCSVFile = File("tweets.csv")
 		val tweetsJSONFile = File("tweets.json")
