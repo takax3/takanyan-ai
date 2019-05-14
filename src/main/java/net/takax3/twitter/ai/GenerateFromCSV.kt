@@ -46,7 +46,7 @@ object GenerateFromCSV {
 			val source = ArrayList<String>()
 			for (tweet in tweets) {
 				tweet.text!!.run {
-					if (contains("@") && contains("://") && contains("#") && tweet.source!!.contains("UserReport")) {
+					if (!WordPreProcessor.isIncludeExcludeWords(this) && tweet.source!!.contains("UserReport")) {
 						println("------------------------")
 						println(this)
 						source.add(this)

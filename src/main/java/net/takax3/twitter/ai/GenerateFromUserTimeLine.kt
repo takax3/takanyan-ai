@@ -64,7 +64,7 @@ object GenerateFromUserTimeLine {
 							// 一件一件の解析
 							status.text.run {
 								// リプライ、URL付、タグツイを除外
-								if (contains("@") && contains("://") && contains("#") && status.user.id != twitter!!.id) {
+								if (!WordPreProcessor.isIncludeExcludeWords(this) && status.user.id != twitter!!.id) {
 									println("------------------------")
 									println(this)
 									sourceList.add(this)
