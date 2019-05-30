@@ -6,6 +6,7 @@ import com.google.gson.JsonArray
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
+import java.util.*
 import kotlin.collections.ArrayList
 
 object WordPreProcessor {
@@ -32,6 +33,7 @@ object WordPreProcessor {
 				Gson().fromJson(FileReader(this), JsonArray::class.java).run {
 					for (json in this) excludeWordsList.add(json.asString)
 				}
+				lastReadTime = Date().time
 			}
 		}
 		
